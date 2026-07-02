@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Postu</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --sea: #0f6e56;
+    --sea-light: #e1f5ee;
+    --sea-dark: #085041;
+    --sand: #ba7517;
+    --sand-light: #faeeda;
+    --ink: #24261f;
+    --ink-soft: #5f5e5a;
+    --line: #e3e0d6;
+    --bg: #faf9f5;
+    --card: #ffffff;
+    --danger: #a32d2d;
+    --danger-light: #fcebeb;
+    --radius: 10px;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height:1.5;
+  }
+  h1,h2,h3{ font-family: Georgia, "Times New Roman", serif; font-weight:600; margin:0; }
+  a{ color:inherit; }
+  button, input, select{
+    font-family: inherit;
+    font-size: 14px;
+  }
+  button{
+    cursor:pointer;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--ink);
+    transition: background .15s ease;
+  }
+  button:hover{ background: #f2f1eb; }
+  button.primary{
+    background: var(--sea);
+    color: #fff;
+    border-color: var(--sea);
+    font-weight:600;
+  }
+  button.primary:hover{ background: var(--sea-dark); }
+  button.danger{ color: var(--danger); border-color: var(--danger); background: transparent; }
+  button.danger:hover{ background: var(--danger-light); }
+  button.chip{
+    padding: 8px 10px;
+    font-size: 12px;
+    text-align:center;
+  }
+  button.chip.on{
+    background: var(--sea-light);
+    color: var(--sea-dark);
+    border-color: var(--sea);
+  }
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    width:100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+  }
+  label.field-label{
+    display:block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .field{ margin-bottom: 14px; }
+  .container{
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+  }
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    position: sticky; top:0; z-index:5;
+  }
+  header.topbar .brand{
+    font-family: Georgia, serif;
+    font-size: 20px;
+    font-weight:700;
+    color: var(--sea-dark);
+    letter-spacing: 0.3px;
+  }
+  header.topbar .brand span{ color: var(--sand); }
+  header.topbar nav button{ font-size:13px; }
+  .card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .stack{ display:flex; flex-direction:column; gap:10px; }
+  .row{ display:flex; gap:10px; }
+  .row > *{ flex:1; }
+  .badge{
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    display:inline-flex; align-items:center; gap:4px;
+    font-weight:600;
+  }
+  .badge.ok{ background: var(--sea-light); color: var(--sea-dark); }
+  .badge.warn{ background: var(--sand-light); color: var(--sand); }
+  .badge.wait{ background:#f1efe8; color: var(--ink-soft); }
+  .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .kpi{
+    background: var(--sea-light);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .kpi .n{ font-size:22px; font-weight:700; color: var(--sea-dark); }
+  .kpi .l{ font-size:11px; color: var(--sea-dark); opacity:.8; }
+  .section-title{
+    font-size: 13px;
+    font-weight:700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--ink-soft);
+    margin: 24px 0 10px;
+  }
+  .avatar{
+    width:36px; height:36px; border-radius:50%;
+    background: var(--sea-light); color:var(--sea-dark);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:13px; flex-shrink:0;
+  }
+  .muted{ color: var(--ink-soft); font-size:13px; }
+  .small{ font-size:12px; }
+  .hidden{ display:none !important; }
+  .landing{
+    min-height: 100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding: 24px;
+  }
+  .landing-card{
+    max-width: 420px; width:100%;
+    text-align:center;
+  }
+  .landing-card h1{ font-size: 32px; margin-bottom: 6px; }
+  .landing-card .tagline{ color: var(--ink-soft); margin-bottom: 28px; font-size:14px; }
+  .role-btn{
+    width:100%;
+    padding: 16px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    text-align:left;
+    font-size:15px;
+    font-weight:600;
+  }
+  .role-btn .sub{
+    display:block;
+    font-size:12px;
+    font-weight:400;
+    color: var(--ink-soft);
+    margin-top:2px;
+  }
+  .link-admin{
+    display:block; margin-top: 24px;
+    font-size:12px; color: var(--ink-soft);
+    text-decoration: underline;
+  }
+  .toast{
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size:13px;
+  }
+  .toast.ok{ background: var(--sea-light); color: var(--sea-dark); }
+  .toast.neutral{ background:#f1efe8; color: var(--ink-soft); }
+  .stars{ display:flex; gap:4px; }
+  .stars button{ padding:4px 6px; border:none; background:none; font-size:16px; }
+  .account-row{
+    display:flex; align-items:center; gap:12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .account-row .meta{ flex:1; }
+  .upload-box{
+    border: 1px dashed var(--ink-soft);
+    border-radius: 8px;
+    padding: 14px;
+    text-align:center;
+    font-size:12px;
+    color: var(--ink-soft);
+  }
+  .req-summary{
+    display:flex; justify-content:space-between; align-items:center;
+    background: var(--sand-light);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size:13px;
+  }
+  .req-summary .val{ font-weight:700; color: var(--sand); }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   A Postu — prototipo funzionante
+   Stack: HTML/JS vanilla + localStorage (pronto per essere
+   sostituito con Firebase Realtime Database, stesso schema dati)
+   ============================================================ */
+
+const ZONE = ["Scicli centro","Scicli","Donnalucata","Sampieri","Cava d'Aliga","Playa Grande","Marina di Ragusa","Modica","Marina di Modica","Pozzallo"];
+const ESTERNI = ["Giardino","Terrazza","Piscina","Cortile"];
+const ESPERIENZA = ["1-3 anni","4-7 anni","8-10 anni","+ di 10 anni"];
+const TIPI_STRUTTURA = ["Casa vacanze","B&B","Villa","Hotel","Affittacamere"];
+const FISCALE = ["Partita IVA","Prestazione occasionale","Dipendente cooperativa","Contratto a chiamata","Altro"];
+const TARIFFE = { ordinaria: 9, straordinaria: 10, apertura: 12 };
+const TARIFFE_LABEL = { ordinaria: "Pulizia ordinaria", straordinaria: "Pulizia straordinaria", apertura: "Pulizia di apertura casa" };
+const FASCE = ["mattina","pomeriggio"];
+
+/* ---------- storage layer: Firebase Realtime Database ---------- */
+/* Sostituisci questi valori con quelli del tuo progetto Firebase
+   (Console Firebase → Impostazioni progetto → Le tue app → Configurazione SDK).
+   Finché restano quelli di esempio, l'app funziona in locale con localStorage,
+   utile per provare prima di collegare un vero progetto Firebase. */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const DB_KEY = "apostu_db_v1";
+const FIREBASE_ENABLED = firebaseConfig.apiKey !== "YOUR_API_KEY";
+let fbRef = null;
+
+function emptyDB(){ return { strutture:{}, collaboratrici:{}, richieste:{} }; }
+
+function loadDB(){
+  const raw = localStorage.getItem(DB_KEY);
+  if(raw) return JSON.parse(raw);
+  return emptyDB();
+}
+function saveDB(dbToSave){ localStorage.setItem(DB_KEY, JSON.stringify(dbToSave)); }
+
+let db = loadDB();
+
+function persist(){
+  saveDB(db);
+  if(FIREBASE_ENABLED && fbRef){
+    fbRef.set(db).catch(err => console.error("Errore salvataggio Firebase:", err));
+  }
+}
+
+function initFirebase(){
+  if(!FIREBASE_ENABLED){
+    console.log("Firebase non configurato: uso localStorage. Modifica firebaseConfig per collegare un vero progetto.");
+    return;
+  }
+  firebase.initializeApp(firebaseConfig);
+  fbRef = firebase.database().ref("apostu/data");
+  fbRef.on("value", (snapshot) => {
+    const remote = snapshot.val();
+    db = remote || emptyDB();
+    saveDB(db); // cache locale come fallback offline
+    render();
+  });
+}
+function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
+
+/* ---------- session ---------- */
+let session = null; // { role: 'struttura'|'collaboratrice', id }
+
+/* ---------- helpers ---------- */
+function initials(name){
+  return name.trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+}
+function calcOre(mq, stanze){
+  let h = (mq/22.5)*0.6 + stanze*0.4;
+  h = Math.round(h*2)/2;
+  if(h < 2) h = 2;
+  return h;
+}
+function fmtEuro(n){ return Math.round(n) + " €"; }
+function starsHTML(n, editable, onPick){
+  const wrap = document.createElement("div");
+  wrap.className = "stars";
+  for(let i=1;i<=5;i++){
+    const b = document.createElement(editable ? "button" : "span");
+    b.textContent = i <= Math.round(n) ? "★" : "☆";
+    b.style.color = i <= Math.round(n) ? "var(--sand)" : "var(--ink-soft)";
+    if(editable){
+      b.type = "button";
+      b.onclick = () => onPick(i);
+    }
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+function ratingOf(c){
+  if(!c.ratingCount) return null;
+  return c.ratingSum / c.ratingCount;
+}
+
+/* ---------- root render ---------- */
+const app = document.getElementById("app");
+function render(){
+  app.innerHTML = "";
+  if(!session){ renderLanding(); return; }
+  if(session.role === "admin"){ renderAdmin(); return; }
+  if(session.role === "struttura"){ renderStrutturaShell(); return; }
+  if(session.role === "collaboratrice"){ renderCollabShell(); return; }
+}
+
+/* ============================================================
+   LANDING
+   ============================================================ */
+function renderLanding(){
+  const wrap = document.createElement("div");
+  wrap.className = "landing";
+  wrap.innerHTML = `
+    <div class="landing-card">
+      <h1>A Postu</h1>
+      <p class="tagline">Il punto d'incontro tra strutture e collaboratrici</p>
+      <button class="role-btn primary" id="go-struttura">
+        Sono una struttura
+        <span class="sub">Trova collaboratrici disponibili per il weekend</span>
+      </button>
+      <button class="role-btn" id="go-collab">
+        Sono una collaboratrice
+        <span class="sub">Gestisci la tua disponibilità e le richieste</span>
+      </button>
+      <a href="#" class="link-admin" id="go-admin">Area verifica iscrizioni</a>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("go-struttura").onclick = () => renderAuth("struttura");
+  document.getElementById("go-collab").onclick = () => renderAuth("collaboratrice");
+  document.getElementById("go-admin").onclick = (e) => { e.preventDefault(); session = { role:"admin" }; render(); };
+}
+
+/* ============================================================
+   AUTH (login semplice per account esistente + registrazione)
+   ============================================================ */
+function renderAuth(role){
+  const isStruttura = role === "struttura";
+  const list = isStruttura ? db.strutture : db.collaboratrici;
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "480px";
+  wrap.style.paddingTop = "48px";
+
+  const accountsHTML = Object.values(list).length
+    ? Object.values(list).map(a => `
+        <div class="account-row">
+          <div class="avatar">${initials(a.nome)}</div>
+          <div class="meta">
+            <div style="font-weight:600; font-size:14px;">${a.nome}</div>
+            <div class="muted small">${a.stato === "verificata" ? "verificata" : "in verifica"}</div>
+          </div>
+          <button data-login="${a.id}" ${a.stato !== "verificata" ? "disabled" : ""}>Accedi</button>
+        </div>
+      `).join("")
+    : `<p class="muted small">Nessun account ancora. Registrati per iniziare.</p>`;
+
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:20px;">← Indietro</button>
+    <h2 style="margin-bottom:4px;">${isStruttura ? "Accedi come struttura" : "Accedi come collaboratrice"}</h2>
+    <p class="muted small" style="margin-bottom:20px;">Seleziona il tuo account o registrane uno nuovo.</p>
+    <div class="stack">${accountsHTML}</div>
+    <button class="primary" id="go-register" style="width:100%; margin-top:20px;">Registra un nuovo account</button>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => { session = null; render(); };
+  document.getElementById("go-register").onclick = () => renderRegister(role);
+  wrap.querySelectorAll("[data-login]").forEach(btn => {
+    btn.onclick = () => { session = { role, id: btn.getAttribute("data-login") }; render(); };
+  });
+}
+
+/* ============================================================
+   REGISTRAZIONE STRUTTURA
+   ============================================================ */
+function renderRegister(role){
+  if(role === "struttura") return renderRegisterStruttura();
+  return renderRegisterCollab();
+}
+
+function renderRegisterStruttura(){
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "480px";
+  wrap.style.paddingTop = "32px";
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:16px;">← Indietro</button>
+    <div class="card">
+      <h3 style="margin-bottom:4px;">Iscrivi la tua struttura</h3>
+      <p class="muted small" style="margin-bottom:18px;">Verifichiamo i dati prima di darti accesso al calendario delle collaboratrici.</p>
+
+      <div class="field"><label class="field-label">Nome struttura</label><input type="text" id="s-nome" placeholder="Casa Duna" /></div>
+
+      <div class="field"><label class="field-label">Tipo struttura</label>
+        <select id="s-tipo">${TIPI_STRUTTURA.map(t=>`<option>${t}</option>`).join("")}</select>
+      </div>
+
+      <div class="field"><label class="field-label">CIR / CIN struttura</label><input type="text" id="s-cir" placeholder="Codice identificativo ricettività" /></div>
+
+      <div class="field"><label class="field-label">Zona</label>
+        <select id="s-zona">${ZONE.map(z=>`<option>${z}</option>`).join("")}</select>
+      </div>
+
+      <div class="row">
+        <div class="field"><label class="field-label">Dimensione (mq)</label><input type="number" id="s-mq" placeholder="90" /></div>
+        <div class="field"><label class="field-label">Numero di stanze</label><input type="number" id="s-stanze" placeholder="4" /></div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Esterni</label>
+        <div class="row" id="s-esterni" style="flex-wrap:wrap; gap:6px;"></div>
+      </div>
+
+      <div class="field"><label class="field-label">Dimensione esterni (mq)</label><input type="number" id="s-esterni-mq" placeholder="30" /></div>
+
+      <div class="field"><label class="field-label">Referente (nome e telefono)</label><input type="text" id="s-referente" placeholder="Fabrizio Lonatica · 333 1234567" /></div>
+
+      <div class="field"><label class="field-label">Documento (visura camerale o simile)</label>
+        <div class="upload-box">carica un file (demo, non richiesto)</div>
+      </div>
+
+      <button class="primary" id="s-submit" style="width:100%;">Invia iscrizione</button>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => renderAuth("struttura");
+
+  const esternoSel = new Set();
+  const esternoWrap = document.getElementById("s-esterni");
+  ESTERNI.forEach(o => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = o;
+    b.onclick = () => {
+      if(esternoSel.has(o)){ esternoSel.delete(o); b.classList.remove("on"); }
+      else { esternoSel.add(o); b.classList.add("on"); }
+    };
+    esternoWrap.appendChild(b);
+  });
+
+  document.getElementById("s-submit").onclick = () => {
+    const nome = document.getElementById("s-nome").value.trim() || "Struttura senza nome";
+    const id = uid("s");
+    db.strutture[id] = {
+      id, nome,
+      tipo: document.getElementById("s-tipo").value,
+      cir: document.getElementById("s-cir").value.trim(),
+      zona: document.getElementById("s-zona").value,
+      mq: parseInt(document.getElementById("s-mq").value,10) || 60,
+      stanze: parseInt(document.getElementById("s-stanze").value,10) || 2,
+      esterni: [...esternoSel],
+      esterniMq: parseInt(document.getElementById("s-esterni-mq").value,10) || 0,
+      referente: document.getElementById("s-referente").value.trim(),
+      stato: "in_verifica"
+    };
+    persist();
+    renderPending("struttura", id);
+  };
+}
+
+/* ============================================================
+   REGISTRAZIONE COLLABORATRICE
+   ============================================================ */
+function renderRegisterCollab(){
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "480px";
+  wrap.style.paddingTop = "32px";
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:16px;">← Indietro</button>
+    <div class="card">
+      <h3 style="margin-bottom:4px;">Iscriviti come collaboratrice</h3>
+      <p class="muted small" style="margin-bottom:18px;">I tuoi dati vengono verificati prima di comparire nel calendario delle strutture.</p>
+
+      <div class="field"><label class="field-label">Nome e cognome</label><input type="text" id="c-nome" placeholder="Maria Grasso" /></div>
+
+      <div class="field">
+        <label class="field-label">Zone di copertura</label>
+        <div id="c-zone" style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;"></div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Automunita</label>
+        <div class="row">
+          <button type="button" class="chip" id="c-auto-si" style="flex:1;">Sì</button>
+          <button type="button" class="chip" id="c-auto-no" style="flex:1;">No</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Livello di esperienza</label>
+        <div id="c-exp" style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;"></div>
+      </div>
+
+      <div class="field"><label class="field-label">Documento d'identità</label>
+        <div class="upload-box">carica un file (demo, non richiesto)</div>
+      </div>
+
+      <div class="field"><label class="field-label">Referenza (opzionale)</label><input type="text" id="c-ref" placeholder="Nome struttura o persona per cui hai già lavorato" /></div>
+
+      <div class="field"><label class="field-label">Inquadramento fiscale</label>
+        <select id="c-fiscale"><option value="">Seleziona...</option>${FISCALE.map(f=>`<option>${f}</option>`).join("")}</select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Richiesta oraria per:</label>
+        <div class="card" style="background:var(--bg); padding:10px 14px;">
+          ${Object.entries(TARIFFE).map(([k,v])=>`
+            <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">
+              <span>${TARIFFE_LABEL[k]}</span><span style="font-weight:700;">${v} €/h</span>
+            </div>`).join("")}
+        </div>
+      </div>
+
+      <button class="primary" id="c-submit" style="width:100%; margin-top:8px;">Invia iscrizione</button>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => renderAuth("collaboratrice");
+
+  const zoneSel = new Set();
+  const zoneWrap = document.getElementById("c-zone");
+  ZONE.forEach(z => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = z;
+    b.onclick = () => {
+      if(zoneSel.has(z)){ zoneSel.delete(z); b.classList.remove("on"); }
+      else { zoneSel.add(z); b.classList.add("on"); }
+    };
+    zoneWrap.appendChild(b);
+  });
+
+  let autoVal = null;
+  const autoSi = document.getElementById("c-auto-si");
+  const autoNo = document.getElementById("c-auto-no");
+  autoSi.onclick = () => { autoVal = "si"; autoSi.classList.add("on"); autoNo.classList.remove("on"); };
+  autoNo.onclick = () => { autoVal = "no"; autoNo.classList.add("on"); autoSi.classList.remove("on"); };
+
+  let expVal = null;
+  const expWrap = document.getElementById("c-exp");
+  ESPERIENZA.forEach(e => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = e;
+    b.onclick = () => {
+      expVal = e;
+      [...expWrap.children].forEach(ch => ch.classList.toggle("on", ch === b));
+    };
+    expWrap.appendChild(b);
+  });
+
+  document.getElementById("c-submit").onclick = () => {
+    const nome = document.getElementById("c-nome").value.trim() || "Collaboratrice senza nome";
+    const id = uid("c");
+    db.collaboratrici[id] = {
+      id, nome,
+      zone: [...zoneSel],
+      automunita: autoVal || "non indicato",
+      esperienza: expVal || ESPERIENZA[0],
+      referenza: document.getElementById("c-ref").value.trim(),
+      fiscale: document.getElementById("c-fiscale").value,
+      stato: "in_verifica",
+      ratingSum: 0, ratingCount: 0
+    };
+    persist();
+    renderPending("collaboratrice", id);
+  };
+}
+
+/* ============================================================
+   STATO "IN VERIFICA"
+   ============================================================ */
+function renderPending(role, id){
+  const record = role === "struttura" ? db.strutture[id] : db.collaboratrici[id];
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "440px";
+  wrap.style.paddingTop = "60px";
+  wrap.style.textAlign = "center";
+  wrap.innerHTML = `
+    <div class="card">
+      <div style="font-size:28px;">⏳</div>
+      <h3 style="margin:12px 0 4px;">Iscrizione in verifica</h3>
+      <p class="muted small" style="margin-bottom:16px;">${record.nome}</p>
+      <p class="muted small" style="margin-bottom:20px;">Non hai ancora accesso alla piattaforma. Verrai avvisato quando l'iscrizione sarà approvata.</p>
+      <button id="to-admin" class="small">Vai all'area verifica (demo) →</button>
+      <br/><br/>
+      <button id="to-landing" class="small">Torna alla home</button>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("to-admin").onclick = () => { session = { role:"admin" }; render(); };
+  document.getElementById("to-landing").onclick = () => { session = null; render(); };
+}
+
+/* ============================================================
+   AREA ADMIN — approvazione iscrizioni
+   ============================================================ */
+function renderAdmin(){
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  const pendingStrutture = Object.values(db.strutture).filter(s => s.stato !== "verificata");
+  const pendingCollab = Object.values(db.collaboratrici).filter(c => c.stato !== "verificata");
+
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:16px;">← Torna alla home</button>
+    <h2 style="margin-bottom:16px;">Area verifica iscrizioni</h2>
+
+    <div class="section-title">Strutture da verificare</div>
+    <div class="stack" id="pending-s"></div>
+
+    <div class="section-title">Collaboratrici da verificare</div>
+    <div class="stack" id="pending-c"></div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => { session = null; render(); };
+
+  const pS = document.getElementById("pending-s");
+  pS.innerHTML = pendingStrutture.length ? "" : `<p class="muted small">Nessuna in attesa.</p>`;
+  pendingStrutture.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "account-row";
+    row.innerHTML = `
+      <div class="avatar">${initials(s.nome)}</div>
+      <div class="meta"><div style="font-weight:600;">${s.nome}</div><div class="muted small">${s.zona} · ${s.tipo}</div></div>
+      <button data-approve-s="${s.id}" class="primary small">Approva</button>
+    `;
+    pS.appendChild(row);
+  });
+  pS.querySelectorAll("[data-approve-s]").forEach(btn => {
+    btn.onclick = () => { db.strutture[btn.getAttribute("data-approve-s")].stato = "verificata"; persist(); renderAdmin(); };
+  });
+
+  const pC = document.getElementById("pending-c");
+  pC.innerHTML = pendingCollab.length ? "" : `<p class="muted small">Nessuna in attesa.</p>`;
+  pendingCollab.forEach(c => {
+    const row = document.createElement("div");
+    row.className = "account-row";
+    row.innerHTML = `
+      <div class="avatar">${initials(c.nome)}</div>
+      <div class="meta"><div style="font-weight:600;">${c.nome}</div><div class="muted small">${c.zone.join(", ") || "nessuna zona"}</div></div>
+      <button data-approve-c="${c.id}" class="primary small">Approva</button>
+    `;
+    pC.appendChild(row);
+  });
+  pC.querySelectorAll("[data-approve-c]").forEach(btn => {
+    btn.onclick = () => { db.collaboratrici[btn.getAttribute("data-approve-c")].stato = "verificata"; persist(); renderAdmin(); };
+  });
+}
+
+/* ============================================================
+   SHELL: TOPBAR comune
+   ============================================================ */
+function topbar(title){
+  const bar = document.createElement("header");
+  bar.className = "topbar";
+  bar.innerHTML = `
+    <div class="brand">A <span>Postu</span></div>
+    <nav><button id="logout" class="small">Esci</button></nav>
+  `;
+  bar.querySelector("#logout").onclick = () => { session = null; render(); };
+  return bar;
+}
+
+/* ============================================================
+   DASHBOARD STRUTTURA
+   ============================================================ */
+function renderStrutturaShell(){
+  const s = db.strutture[session.id];
+  if(!s){ session = null; render(); return; }
+  app.appendChild(topbar());
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  app.appendChild(wrap);
+
+  const misRichieste = Object.values(db.richieste).filter(r => r.strutturaId === s.id);
+  const daConfermare = misRichieste.filter(r => r.stato === "accettata");
+  const weekendCount = misRichieste.filter(r => r.stato === "accettata" || r.stato === "nuova").length;
+
+  wrap.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+      <div>
+        <h2>${s.nome}</h2>
+        <p class="muted small">${s.zona}</p>
+      </div>
+      <span class="badge ${s.stato === "verificata" ? "ok" : "wait"}">${s.stato === "verificata" ? "✓ verificata" : "in verifica"}</span>
+    </div>
+
+    <div class="grid3">
+      <div class="kpi"><div class="n">${weekendCount}</div><div class="l">richieste attive</div></div>
+      <div class="kpi"><div class="n">${daConfermare.length}</div><div class="l">da confermare</div></div>
+      <div class="kpi"><div class="n">${misRichieste.filter(r=>r.stato==="completata").length}</div><div class="l">completate</div></div>
+    </div>
+
+    <div class="section-title">Collaboratrici disponibili</div>
+    <div class="stack" id="collab-list"></div>
+
+    <div class="section-title">Le tue richieste</div>
+    <div class="stack" id="req-list"></div>
+  `;
+
+  renderCollabListForStruttura(wrap.querySelector("#collab-list"), s);
+  renderRichiesteForStruttura(wrap.querySelector("#req-list"), s);
+}
+
+function renderCollabListForStruttura(container, struttura){
+  const verified = Object.values(db.collaboratrici).filter(c => c.stato === "verificata");
+  if(!verified.length){ container.innerHTML = `<p class="muted small">Nessuna collaboratrice verificata ancora.</p>`; return; }
+  container.innerHTML = "";
+  verified.forEach(c => {
+    const rating = ratingOf(c);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="avatar">${initials(c.nome)}</div>
+          <div>
+            <div style="font-weight:600; font-size:14px;">${c.nome}</div>
+            <div class="muted small">${c.zone.join(", ") || "zona non indicata"}</div>
+            <span class="badge wait" style="margin-top:4px;">${c.esperienza} di esperienza</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          ${rating ? `<div class="small" style="font-weight:600;">${rating.toFixed(1)} ★</div><div class="muted small">${c.ratingCount} pulizie</div>` : `<div class="muted small">nuova</div>`}
+        </div>
+      </div>
+      <button data-contact="${c.id}" class="primary small" style="margin-top:12px; width:100%;">Contatta collaboratrice</button>
+      <div class="contact-form hidden" data-form="${c.id}" style="margin-top:12px;"></div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll("[data-contact]").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute("data-contact");
+      const formWrap = container.querySelector(`[data-form="${id}"]`);
+      const isOpen = !formWrap.classList.contains("hidden");
+      container.querySelectorAll(".contact-form").forEach(f => f.classList.add("hidden"));
+      if(isOpen) return;
+      formWrap.classList.remove("hidden");
+      formWrap.innerHTML = `
+        <div class="field"><label class="field-label">Data</label><input type="date" data-f-date /></div>
+        <div class="field"><label class="field-label">Fascia</label>
+          <select data-f-fascia>${FASCE.map(f=>`<option>${f}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label class="field-label">Tipo pulizia</label>
+          <select data-f-tipo>${Object.keys(TARIFFE).map(t=>`<option value="${t}">${TARIFFE_LABEL[t]}</option>`).join("")}</select>
+        </div>
+        <button class="primary small" data-send="${id}" style="width:100%;">Invia richiesta</button>
+      `;
+      formWrap.querySelector(`[data-send="${id}"]`).onclick = () => {
+        const date = formWrap.querySelector("[data-f-date]").value;
+        const fascia = formWrap.querySelector("[data-f-fascia]").value;
+        const tipo = formWrap.querySelector("[data-f-tipo]").value;
+        const ore = calcOre(struttura.mq, struttura.stanze);
+        const rid = uid("r");
+        db.richieste[rid] = {
+          id: rid, strutturaId: struttura.id, collabId: id,
+          data: date || "da definire", fascia, tipo,
+          ore, guadagno: ore * TARIFFE[tipo],
+          stato: "nuova",
+          recensioneStruttura: null, recensioneCollab: null
+        };
+        persist();
+        renderStrutturaShell();
+      };
+    };
+  });
+}
+
+function renderRichiesteForStruttura(container, struttura){
+  const list = Object.values(db.richieste).filter(r => r.strutturaId === struttura.id)
+    .sort((a,b) => (a.data > b.data ? -1 : 1));
+  if(!list.length){ container.innerHTML = `<p class="muted small">Nessuna richiesta ancora. Contatta una collaboratrice qui sopra.</p>`; return; }
+  container.innerHTML = "";
+  list.forEach(r => {
+    const c = db.collaboratrici[r.collabId];
+    const card = document.createElement("div");
+    card.className = "card";
+    const statoBadge = {
+      nuova: `<span class="badge warn">in attesa di risposta</span>`,
+      rifiutata: `<span class="badge wait">rifiutata</span>`,
+      accettata: `<span class="badge ok">accettata</span>`,
+      confermata: `<span class="badge ok">confermata da te</span>`,
+      completata: `<span class="badge ok">completata</span>`
+    }[r.stato] || "";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-weight:600; font-size:14px;">${c ? c.nome : "—"} · ${r.data} · ${r.fascia}</div>
+        ${statoBadge}
+      </div>
+      <div class="muted small">${TARIFFE_LABEL[r.tipo]} · ${r.ore} ore · ${fmtEuro(r.guadagno)}</div>
+      <div id="actions-${r.id}" style="margin-top:10px;"></div>
+    `;
+    container.appendChild(card);
+    const actions = card.querySelector(`#actions-${r.id}`);
+    if(r.stato === "accettata"){
+      const btn = document.createElement("button");
+      btn.className = "primary small";
+      btn.textContent = "Conferma lavoro svolto";
+      btn.onclick = () => { r.stato = "confermata"; persist(); renderStrutturaShell(); };
+      actions.appendChild(btn);
+    } else if(r.stato === "confermata" && !r.recensioneStruttura){
+      const box = document.createElement("div");
+      let chosen = 0;
+      const starWrap = starsHTML(0, true, (n) => { chosen = n; starWrap.replaceWith(starsHTML(n, true, (m)=>{chosen=m;})); });
+      box.appendChild(starWrap);
+      const sendBtn = document.createElement("button");
+      sendBtn.className = "small";
+      sendBtn.style.marginTop = "8px";
+      sendBtn.textContent = "Invia recensione";
+      sendBtn.onclick = () => {
+        if(chosen === 0) return;
+        r.recensioneStruttura = chosen;
+        if(r.recensioneCollab){
+          const cc = db.collaboratrici[r.collabId];
+          cc.ratingSum += r.recensioneCollab === null ? 0 : 0;
+          r.stato = "completata";
+          applyRatingIfBothDone(r);
+        }
+        persist();
+        renderStrutturaShell();
+      };
+      box.appendChild(sendBtn);
+      actions.appendChild(box);
+    } else if(r.stato === "confermata" && r.recensioneStruttura){
+      actions.innerHTML = `<p class="muted small">Recensione inviata. In attesa che ${c ? c.nome : "la collaboratrice"} recensisca voi.</p>`;
+    } else if(r.stato === "completata"){
+      actions.innerHTML = `<p class="muted small">Recensioni scambiate e pubblicate.</p>`;
+    }
+  });
+}
+
+function applyRatingIfBothDone(r){
+  // chiamato quando entrambe le recensioni sono presenti: aggiorna il rating della collaboratrice
+  const c = db.collaboratrici[r.collabId];
+  if(!c) return;
+  if(r._ratingApplied) return;
+  c.ratingSum += r.recensioneStruttura || 0;
+  c.ratingCount += 1;
+  r._ratingApplied = true;
+}
+
+/* ============================================================
+   DASHBOARD COLLABORATRICE
+   ============================================================ */
+function renderCollabShell(){
+  const c = db.collaboratrici[session.id];
+  if(!c){ session = null; render(); return; }
+  app.appendChild(topbar());
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  app.appendChild(wrap);
+
+  const mieRichieste = Object.values(db.richieste).filter(r => r.collabId === c.id);
+  const inAttesa = mieRichieste.filter(r => r.stato === "nuova");
+  const rating = ratingOf(c);
+
+  wrap.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="avatar">${initials(c.nome)}</div>
+        <div>
+          <h2 style="font-size:18px;">${c.nome}</h2>
+          <p class="muted small">${c.zone.join(", ") || "zona non indicata"}</p>
+        </div>
+      </div>
+      <span class="badge ${c.stato === "verificata" ? "ok" : "wait"}">${c.stato === "verificata" ? "✓ verificata" : "in verifica"}</span>
+    </div>
+
+    <div class="grid3">
+      <div class="kpi"><div class="n">${rating ? rating.toFixed(1) : "—"}</div><div class="l">valutazione</div></div>
+      <div class="kpi"><div class="n">${c.ratingCount}</div><div class="l">pulizie svolte</div></div>
+      <div class="kpi"><div class="n">${inAttesa.length}</div><div class="l">richieste in attesa</div></div>
+    </div>
+
+    <div class="section-title">Richieste in attesa</div>
+    <div class="stack" id="pending-req"></div>
+
+    <div class="section-title">I tuoi impegni</div>
+    <div class="stack" id="my-jobs"></div>
+
+    <div class="section-title">Da recensire</div>
+    <div class="stack" id="to-review"></div>
+  `;
+
+  renderPendingRequests(wrap.querySelector("#pending-req"), c);
+  renderMyJobs(wrap.querySelector("#my-jobs"), c);
+  renderToReview(wrap.querySelector("#to-review"), c);
+}
+
+function renderPendingRequests(container, collab){
+  const list = Object.values(db.richieste).filter(r => r.collabId === collab.id && r.stato === "nuova");
+  if(!list.length){ container.innerHTML = `<p class="muted small">Nessuna richiesta in attesa.</p>`; return; }
+  container.innerHTML = "";
+  list.forEach(r => {
+    const s = db.strutture[r.strutturaId];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-weight:600; font-size:14px;">${s ? s.nome : "—"} · ${r.data}, ${r.fascia}</div>
+        <span class="badge warn">nuova</span>
+      </div>
+      <div class="muted small">📍 ${s ? s.zona : ""}</div>
+      <div class="muted small">${s ? s.tipo : ""} · ${s ? s.mq : ""} mq · ${s ? s.stanze : ""} stanze${s && s.esterni.length ? " · " + s.esterni.join(", ") : ""}</div>
+      <div class="req-summary">
+        <span>⏱ tempo stimato</span><span class="val">${r.ore} ore</span>
+      </div>
+      <div class="req-summary">
+        <span>guadagno potenziale</span><span class="val">${fmtEuro(r.guadagno)}</span>
+      </div>
+      <div class="row">
+        <button data-accept="${r.id}" class="primary small">Accetta</button>
+        <button data-decline="${r.id}" class="small">Rifiuta</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+  container.querySelectorAll("[data-accept]").forEach(btn => {
+    btn.onclick = () => { db.richieste[btn.getAttribute("data-accept")].stato = "accettata"; persist(); renderCollabShell(); };
+  });
+  container.querySelectorAll("[data-decline]").forEach(btn => {
+    btn.onclick = () => { db.richieste[btn.getAttribute("data-decline")].stato = "rifiutata"; persist(); renderCollabShell(); };
+  });
+}
+
+function renderMyJobs(container, collab){
+  const list = Object.values(db.richieste).filter(r => r.collabId === collab.id && (r.stato === "accettata" || r.stato === "confermata"));
+  if(!list.length){ container.innerHTML = `<p class="muted small">Nessun impegno confermato.</p>`; return; }
+  container.innerHTML = "";
+  list.forEach(r => {
+    const s = db.strutture[r.strutturaId];
+    const row = document.createElement("div");
+    row.className = "card";
+    row.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:600; font-size:14px;">${r.data} · ${r.fascia}</div>
+          <div class="muted small">${s ? s.nome : "—"} · ${s ? s.zona : ""} · ${TARIFFE_LABEL[r.tipo]}</div>
+        </div>
+        <span class="badge ${r.stato === "confermata" ? "ok" : "wait"}">${r.stato === "confermata" ? "confermato" : "in attesa conferma"}</span>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderToReview(container, collab){
+  const list = Object.values(db.richieste).filter(r => r.collabId === collab.id && r.stato === "confermata" && !r.recensioneCollab);
+  const done = Object.values(db.richieste).filter(r => r.collabId === collab.id && r.stato === "completata");
+  if(!list.length && !done.length){ container.innerHTML = `<p class="muted small">Nessuna recensione da lasciare al momento.</p>`; return; }
+  container.innerHTML = "";
+  list.forEach(r => {
+    const s = db.strutture[r.strutturaId];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div style="font-weight:600; font-size:14px; margin-bottom:8px;">${s ? s.nome : "—"} · ${r.data}</div>`;
+    let chosen = 0;
+    const starWrap = starsHTML(0, true, (n)=>{ chosen=n; starWrap.replaceWith(starsHTML(n,true,(m)=>{chosen=m;})); });
+    card.appendChild(starWrap);
+    const sendBtn = document.createElement("button");
+    sendBtn.className = "small";
+    sendBtn.style.marginTop = "8px";
+    sendBtn.textContent = "Invia recensione";
+    sendBtn.onclick = () => {
+      if(chosen === 0) return;
+      r.recensioneCollab = chosen;
+      if(r.recensioneStruttura){
+        r.stato = "completata";
+        applyRatingIfBothDone(r);
+      }
+      persist();
+      renderCollabShell();
+    };
+    card.appendChild(sendBtn);
+    container.appendChild(card);
+  });
+  done.forEach(r => {
+    const s = db.strutture[r.strutturaId];
+    const row = document.createElement("div");
+    row.className = "card";
+    row.innerHTML = `<div class="muted small">${s ? s.nome : "—"} · ${r.data} · recensioni scambiate e pubblicate.</div>`;
+    container.appendChild(row);
+  });
+}
+
+/* ---------- avvio ---------- */
+initFirebase();
+render();
+</script>
+</body>
+</html>
