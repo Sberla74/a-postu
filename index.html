@@ -6,6 +6,7 @@
 <title>A Postu</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --sea: #0f6e56;
@@ -155,7 +156,57 @@
     text-align:center;
   }
   .landing-card h1{ font-size: 32px; margin-bottom: 6px; }
-  .landing-card .tagline{ color: var(--ink-soft); margin-bottom: 28px; font-size:14px; }
+  .landing-card .motto{ font-style: italic; color: var(--sand); font-weight:600; font-size:15px; margin-bottom: 10px; }
+  .landing-card .tagline{ color: var(--ink-soft); margin-bottom: 20px; font-size:14px; }
+  .mini-calendar{
+    background: var(--sea-light);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 24px;
+  }
+  .mini-cal-header{
+    font-weight:700;
+    font-size:13px;
+    color: var(--sea-dark);
+    text-transform: capitalize;
+    margin-bottom: 10px;
+    text-align:center;
+  }
+  .mini-cal-grid{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .mini-cal-weekday{
+    font-size:10px;
+    font-weight:700;
+    color: var(--sea-dark);
+    opacity:.6;
+    text-align:center;
+    padding: 2px 0;
+  }
+  .mini-cal-day{
+    font-size:12px;
+    text-align:center;
+    padding: 6px 0;
+    border-radius: 6px;
+    color: var(--ink);
+  }
+  .mini-cal-day.empty{ visibility:hidden; }
+  .mini-cal-day.today{
+    background: var(--sea);
+    color:#fff;
+    font-weight:700;
+  }
+  .landing-feed{ text-align:left; margin-bottom:20px; }
+  .landing-feed-item{
+    font-size:12px;
+    color: var(--ink-soft);
+    background: var(--sand-light);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom:6px;
+  }
   .role-btn{
     width:100%;
     padding: 16px;
@@ -171,6 +222,9 @@
     font-weight:400;
     color: var(--ink-soft);
     margin-top:2px;
+  }
+  .role-btn.primary .sub{
+    color: rgba(255,255,255,0.85);
   }
   .link-admin{
     display:block; margin-top: 24px;
@@ -232,6 +286,82 @@ const FISCALE = ["Partita IVA","Prestazione occasionale","Dipendente cooperativa
 const TARIFFE = { ordinaria: 9, straordinaria: 10, apertura: 12 };
 const TARIFFE_LABEL = { ordinaria: "Pulizia ordinaria", straordinaria: "Pulizia straordinaria", apertura: "Pulizia di apertura casa" };
 const FASCE = ["mattina","pomeriggio"];
+const MESI = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const GIORNI_SETTIMANA = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
+
+function buildMiniCalendarHTML(){
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const todayDate = today.getDate();
+
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let startWeekday = firstDay.getDay(); // 0=Dom,1=Lun,...6=Sab
+  startWeekday = (startWeekday === 0) ? 6 : startWeekday - 1; // riallineo a settimana Lun-Dom
+
+  let cells = "";
+  for(let i=0; i<startWeekday; i++){
+    cells += `<div class="mini-cal-day empty">-</div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const isToday = d === todayDate;
+    cells += `<div class="mini-cal-day${isToday ? " today" : ""}">${d}</div>`;
+  }
+
+  return `
+    <div class="mini-calendar">
+      <div class="mini-cal-header">${MESI[month]} ${year}</div>
+      <div class="mini-cal-grid">
+        ${GIORNI_SETTIMANA.map(g => `<div class="mini-cal-weekday">${g}</div>`).join("")}
+        ${cells}
+      </div>
+    </div>
+  `;
+}
+
+const GIORNI_LUNGHI = ["lunedì","martedì","mercoledì","giovedì","venerdì","sabato","domenica"];
+
+function formatDataItaliana(iso){
+  if(!iso) return null;
+  const d = new Date(iso + "T00:00:00");
+  if(isNaN(d.getTime())) return null;
+  let wd = d.getDay(); // 0=Dom,1=Lun,...6=Sab
+  wd = (wd === 0) ? 6 : wd - 1; // riallineo a settimana Lun=0..Dom=6
+  return `${GIORNI_LUNGHI[wd]} ${d.getDate()} ${MESI[d.getMonth()].toLowerCase()}`;
+}
+
+/* Sezione "Richieste in corso" in home. Se esistono richieste reali delle
+   strutture (in attesa di risposta) vengono mostrate quelle, ordinate per
+   data piu' vicina; altrimenti si mostra un esempio statico (Casa Duna),
+   cosi' la sezione non appare mai vuota mentre il database e' ancora senza
+   dati veri. La riga di disponibilita' delle collaboratrici (Sara F.) e'
+   invece SEMPRE un ESEMPIO STATICO illustrativo: non esiste ancora una
+   funzionalita' che permetta alle collaboratrici di indicare le proprie
+   date/orari liberi - quando la costruiremo, andra' sostituita con dati
+   reali come gia' avviene per le richieste delle strutture. */
+function buildLandingFeedHTML(){
+  const richiesteStrutture = Object.values(db.richieste)
+    .filter(r => r.stato === "nuova")
+    .map(r => ({ r, s: db.strutture[r.strutturaId], dataFmt: formatDataItaliana(r.data) }))
+    .filter(x => x.s && x.dataFmt)
+    .sort((a,b) => (a.r.data < b.r.data ? -1 : 1))
+    .slice(0, 3)
+    .map(x => `${x.s.nome} cerca collaboratrice per ${x.dataFmt}`);
+
+  const esempioStruttura = "Casa Duna cerca collaboratrice per sabato 18 luglio";
+  const esempioDisponibilitaCollab = "Sara F. è disponibile per mercoledì 15 luglio dalle 8-13 e venerdì 17 dalle 8-13";
+
+  const voci = [...(richiesteStrutture.length ? richiesteStrutture : [esempioStruttura]), esempioDisponibilitaCollab];
+
+  return `
+    <div class="section-title" style="margin-top:0;">Richieste in corso</div>
+    <div class="landing-feed">
+      ${voci.map(v => `<div class="landing-feed-item">${v}</div>`).join("")}
+    </div>
+  `;
+}
 
 /* ---------- storage layer: Firebase Realtime Database ---------- */
 /* Sostituisci questi valori con quelli del tuo progetto Firebase
@@ -239,34 +369,80 @@ const FASCE = ["mattina","pomeriggio"];
    Finché restano quelli di esempio, l'app funziona in locale con localStorage,
    utile per provare prima di collegare un vero progetto Firebase. */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBrSjHCZ9bbq1u3dwII_KoDs9Evs-GqfWU",
+  authDomain: "a-postu.firebaseapp.com",
+  databaseURL: "https://a-postu-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "a-postu",
+  storageBucket: "a-postu.firebasestorage.app",
+  messagingSenderId: "1025486134971",
+  appId: "1:1025486134971:web:416bdcf9ebc43920c8139e"
 };
 
 const DB_KEY = "apostu_db_v1";
-const FIREBASE_ENABLED = firebaseConfig.apiKey !== "YOUR_API_KEY";
+const FIREBASE_ENABLED = firebaseConfig.apiKey !== "YOUR_API_KEY" && !firebaseConfig.databaseURL.startsWith("TODO_");
 let fbRef = null;
 
 function emptyDB(){ return { strutture:{}, collaboratrici:{}, richieste:{} }; }
 
-function loadDB(){
-  const raw = localStorage.getItem(DB_KEY);
-  if(raw) return JSON.parse(raw);
-  return emptyDB();
+/* Firebase Realtime Database non salva le chiavi con oggetto vuoto {} (es. prima
+   che ci sia una collaboratrice registrata): quando i dati tornano dal server,
+   quelle chiavi possono mancare del tutto. Questa funzione le ricostruisce
+   sempre, cosi' il resto del codice puo' contare su strutture/collaboratrici/
+   richieste sempre presenti. */
+function normalizeDB(raw){
+  if(!raw) return emptyDB();
+  return {
+    strutture: raw.strutture || {},
+    collaboratrici: raw.collaboratrici || {},
+    richieste: raw.richieste || {}
+  };
 }
-function saveDB(dbToSave){ localStorage.setItem(DB_KEY, JSON.stringify(dbToSave)); }
+
+function showError(msg){
+  let banner = document.getElementById("global-error-banner");
+  if(!banner){
+    banner = document.createElement("div");
+    banner.id = "global-error-banner";
+    banner.style.cssText = "position:fixed; top:0; left:0; right:0; z-index:9999; background:#a32d2d; color:#fff; padding:10px 16px; font-size:13px; text-align:center;";
+    document.body.prepend(banner);
+  }
+  banner.textContent = "Errore: " + msg + " (ricarica la pagina e riprova)";
+}
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw) return normalizeDB(JSON.parse(raw));
+    return emptyDB();
+  } catch(err){
+    console.error("Errore lettura dati salvati:", err);
+    showError("impossibile leggere i dati salvati sul browser (" + err.message + ")");
+    return emptyDB();
+  }
+}
+function saveDB(dbToSave){
+  try{
+    localStorage.setItem(DB_KEY, JSON.stringify(dbToSave));
+  } catch(err){
+    console.error("Errore salvataggio dati:", err);
+    showError("impossibile salvare i dati sul browser (" + err.message + ")");
+    throw err;
+  }
+}
 
 let db = loadDB();
 
 function persist(){
-  saveDB(db);
+  try{
+    saveDB(db);
+  } catch(err){
+    return; // errore gia' mostrato da saveDB, non proseguire con Firebase
+  }
   if(FIREBASE_ENABLED && fbRef){
-    fbRef.set(db).catch(err => console.error("Errore salvataggio Firebase:", err));
+    fbRef.set(db).catch(err => {
+      console.error("Errore salvataggio Firebase:", err);
+      showError("impossibile salvare su Firebase (" + err.message + ")");
+    });
   }
 }
 
@@ -276,12 +452,22 @@ function initFirebase(){
     return;
   }
   firebase.initializeApp(firebaseConfig);
-  fbRef = firebase.database().ref("apostu/data");
-  fbRef.on("value", (snapshot) => {
-    const remote = snapshot.val();
-    db = remote || emptyDB();
-    saveDB(db); // cache locale come fallback offline
-    render();
+  /* Autenticazione anonima: richiesta dalle regole di sicurezza del database
+     (.read/.write: "auth != null"). Ogni visitatore ottiene una sessione
+     automatica, senza bisogno di login - serve solo ad alzare la soglia
+     rispetto a un accesso completamente libero (es. via comando diretto). */
+  firebase.auth().signInAnonymously().catch(err => {
+    console.error("Errore autenticazione anonima Firebase:", err);
+    showError("impossibile autenticarsi con Firebase (" + err.message + ")");
+  });
+  firebase.auth().onAuthStateChanged(user => {
+    if(!user || fbRef) return; // aspetto l'autenticazione, evito doppio listener
+    fbRef = firebase.database().ref("apostu/data");
+    fbRef.on("value", (snapshot) => {
+      db = normalizeDB(snapshot.val());
+      saveDB(db); // cache locale come fallback offline
+      render();
+    });
   });
 }
 function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
@@ -340,22 +526,61 @@ function renderLanding(){
   wrap.innerHTML = `
     <div class="landing-card">
       <h1>A Postu</h1>
-      <p class="tagline">Il punto d'incontro tra strutture e collaboratrici</p>
+      <p class="motto">Semu a Postu</p>
+      <p class="tagline">Uniamo le esigenze delle strutture turistiche con le esigenze delle collaboratrici.</p>
+      ${buildMiniCalendarHTML()}
       <button class="role-btn primary" id="go-struttura">
         Sono una struttura
-        <span class="sub">Trova collaboratrici disponibili per il weekend</span>
+        <span class="sub">Cerchiamo collaboratrici in queste date</span>
       </button>
       <button class="role-btn" id="go-collab">
         Sono una collaboratrice
         <span class="sub">Gestisci la tua disponibilità e le richieste</span>
       </button>
+      ${buildLandingFeedHTML()}
       <a href="#" class="link-admin" id="go-admin">Area verifica iscrizioni</a>
     </div>
   `;
   app.appendChild(wrap);
-  document.getElementById("go-struttura").onclick = () => renderAuth("struttura");
-  document.getElementById("go-collab").onclick = () => renderAuth("collaboratrice");
+  document.getElementById("go-struttura").onclick = () => renderIntro("struttura");
+  document.getElementById("go-collab").onclick = () => renderIntro("collaboratrice");
   document.getElementById("go-admin").onclick = (e) => { e.preventDefault(); session = { role:"admin" }; render(); };
+}
+
+/* ============================================================
+   PAGINA DESCRITTIVA (per ruolo, prima della registrazione)
+   ============================================================ */
+const INTRO_CONTENT = {
+  struttura: {
+    titolo: "Per le strutture ricettive",
+    testo: "A Postu ti aiuta a trovare rapidamente una collaboratrice qualificata e verificata per le pulizie della tua struttura — weekend, cambi ospiti, aperture stagionali — senza passaparola e senza perdite di tempo. L'obiettivo è darti un canale diretto e affidabile con le collaboratrici della zona, con recensioni reciproche per costruire fiducia nel tempo."
+  },
+  collaboratrice: {
+    titolo: "Per le collaboratrici",
+    testo: "A Postu ti mette in contatto con le strutture ricettive della zona che cercano una collaboratrice per le pulizie. Scegli tu le zone dove vuoi lavorare, ricevi le richieste, accetta quelle che ti interessano e costruisci la tua reputazione con le recensioni. L'obiettivo è darti un canale diretto e trasparente per trovare lavoro, gestendo tu la tua disponibilità."
+  }
+};
+
+function renderIntro(role){
+  app.innerHTML = "";
+  const content = INTRO_CONTENT[role];
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "480px";
+  wrap.style.paddingTop = "32px";
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:16px;">← Indietro</button>
+    <div class="card">
+      <h3 style="margin-bottom:12px;">${content.titolo}</h3>
+      <p class="muted small" style="margin-bottom:24px; line-height:1.6;">${content.testo}</p>
+      <button class="primary" id="go-to-register" style="width:100%;">Registrati</button>
+      <button id="go-to-login" class="small" style="width:100%; margin-top:10px; background:transparent; border:none; text-decoration:underline;">Hai già un account? Accedi</button>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => { session = null; render(); };
+  document.getElementById("go-to-register").onclick = () => renderRegister(role);
+  document.getElementById("go-to-login").onclick = () => renderAuth(role);
 }
 
 /* ============================================================
@@ -391,7 +616,7 @@ function renderAuth(role){
     <button class="primary" id="go-register" style="width:100%; margin-top:20px;">Registra un nuovo account</button>
   `;
   app.appendChild(wrap);
-  document.getElementById("back").onclick = () => { session = null; render(); };
+  document.getElementById("back").onclick = () => renderIntro(role);
   document.getElementById("go-register").onclick = () => renderRegister(role);
   wrap.querySelectorAll("[data-login]").forEach(btn => {
     btn.onclick = () => { session = { role, id: btn.getAttribute("data-login") }; render(); };
@@ -452,7 +677,7 @@ function renderRegisterStruttura(){
     </div>
   `;
   app.appendChild(wrap);
-  document.getElementById("back").onclick = () => renderAuth("struttura");
+  document.getElementById("back").onclick = () => renderIntro("struttura");
 
   const esternoSel = new Set();
   const esternoWrap = document.getElementById("s-esterni");
@@ -545,7 +770,7 @@ function renderRegisterCollab(){
     </div>
   `;
   app.appendChild(wrap);
-  document.getElementById("back").onclick = () => renderAuth("collaboratrice");
+  document.getElementById("back").onclick = () => renderIntro("collaboratrice");
 
   const zoneSel = new Set();
   const zoneWrap = document.getElementById("c-zone");
