@@ -378,6 +378,13 @@ const firebaseConfig = {
   appId: "1:1025486134971:web:416bdcf9ebc43920c8139e"
 };
 
+/* Protezione minima per l'area di verifica iscrizioni: blocca chi visita il
+   sito per caso, ma essendo solo lato client (visibile nel codice sorgente
+   della pagina) NON impedisce a una persona esperta di scrivere direttamente
+   nel database. Per una protezione solida serve un vero account admin
+   collegato a Firebase Authentication + regole dedicate. */
+const ADMIN_PASSWORD = "postu2026";
+
 const DB_KEY = "apostu_db_v1";
 const FIREBASE_ENABLED = firebaseConfig.apiKey !== "YOUR_API_KEY" && !firebaseConfig.databaseURL.startsWith("TODO_");
 let fbRef = null;
@@ -544,7 +551,43 @@ function renderLanding(){
   app.appendChild(wrap);
   document.getElementById("go-struttura").onclick = () => renderIntro("struttura");
   document.getElementById("go-collab").onclick = () => renderIntro("collaboratrice");
-  document.getElementById("go-admin").onclick = (e) => { e.preventDefault(); session = { role:"admin" }; render(); };
+  document.getElementById("go-admin").onclick = (e) => { e.preventDefault(); renderAdminLogin(); };
+}
+
+/* ============================================================
+   ACCESSO AREA VERIFICA ISCRIZIONI (protezione minima via password)
+   ============================================================ */
+function renderAdminLogin(){
+  app.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "container";
+  wrap.style.maxWidth = "420px";
+  wrap.style.paddingTop = "60px";
+  wrap.innerHTML = `
+    <button id="back" class="small" style="margin-bottom:16px;">← Indietro</button>
+    <div class="card">
+      <h3 style="margin-bottom:12px;">Area verifica iscrizioni</h3>
+      <div class="field">
+        <label class="field-label">Password</label>
+        <input type="password" id="admin-password" placeholder="••••••••" />
+      </div>
+      <div id="admin-login-error" class="muted small" style="color: var(--danger); margin-bottom:10px; display:none;">Password errata.</div>
+      <button class="primary" id="admin-login-submit" style="width:100%;">Entra</button>
+    </div>
+  `;
+  app.appendChild(wrap);
+  document.getElementById("back").onclick = () => { session = null; render(); };
+  const submit = () => {
+    const value = document.getElementById("admin-password").value;
+    if(value === ADMIN_PASSWORD){
+      session = { role: "admin" };
+      render();
+    } else {
+      document.getElementById("admin-login-error").style.display = "block";
+    }
+  };
+  document.getElementById("admin-login-submit").onclick = submit;
+  document.getElementById("admin-password").onkeydown = (e) => { if(e.key === "Enter") submit(); };
 }
 
 /* ============================================================
