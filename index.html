@@ -350,13 +350,13 @@ function buildLandingFeedHTML(){
     .filter(r => r.stato === "nuova")
     .map(r => ({ r, s: db.strutture[r.strutturaId], dataFmt: formatDataItaliana(r.data) }))
     .filter(x => x.s && x.dataFmt)
-    .map(x => ({ testo: `${x.s.nome} cerca collaboratrice per ${x.dataFmt}`, tipo: "struttura", data: x.r.data }));
+    .map(x => ({ testo: `<strong>${x.s.nome}</strong> cerca collaboratrice per ${x.dataFmt}`, tipo: "struttura", data: x.r.data }));
 
-  const esempioStruttura = { testo: "Casa Duna cerca collaboratrice per sabato 18 luglio", tipo: "struttura", data: "2026-07-18" };
+  const esempioStruttura = { testo: "<strong>Casa Duna</strong> cerca collaboratrice per sabato 18 luglio", tipo: "struttura", data: "2026-07-18" };
   const esempiDisponibilitaCollab = [
-    { testo: "Sara F. è disponibile per mercoledì 15 luglio dalle 8-13 e venerdì 17 dalle 8-13", tipo: "collab", data: "2026-07-15" },
-    { testo: "Lucia T. è disponibile per giovedì 16 luglio dalle 8 alle 12", tipo: "collab", data: "2026-07-16" },
-    { testo: "Franca B. è disponibile lunedì 3 agosto dalle 8.30 alle 12.30", tipo: "collab", data: "2026-08-03" }
+    { testo: "<strong>Sara F.</strong> è disponibile per mercoledì 15 luglio dalle 8-13 e venerdì 17 dalle 8-13", tipo: "collab", data: "2026-07-15" },
+    { testo: "<strong>Lucia T.</strong> è disponibile per giovedì 16 luglio dalle 8 alle 12", tipo: "collab", data: "2026-07-16" },
+    { testo: "<strong>Franca B.</strong> è disponibile lunedì 3 agosto dalle 8.30 alle 12.30", tipo: "collab", data: "2026-08-03" }
   ];
 
   const voci = [...(richiesteStrutture.length ? richiesteStrutture : [esempioStruttura]), ...esempiDisponibilitaCollab]
