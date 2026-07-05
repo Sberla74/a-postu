@@ -207,6 +207,10 @@
     padding: 8px 12px;
     margin-bottom:6px;
   }
+  .landing-feed-item.collab{
+    background: var(--sea-light);
+    color: var(--sea-dark);
+  }
   .role-btn{
     width:100%;
     padding: 16px;
@@ -346,19 +350,22 @@ function buildLandingFeedHTML(){
     .filter(r => r.stato === "nuova")
     .map(r => ({ r, s: db.strutture[r.strutturaId], dataFmt: formatDataItaliana(r.data) }))
     .filter(x => x.s && x.dataFmt)
-    .sort((a,b) => (a.r.data < b.r.data ? -1 : 1))
-    .slice(0, 3)
-    .map(x => `${x.s.nome} cerca collaboratrice per ${x.dataFmt}`);
+    .map(x => ({ testo: `${x.s.nome} cerca collaboratrice per ${x.dataFmt}`, tipo: "struttura", data: x.r.data }));
 
-  const esempioStruttura = "Casa Duna cerca collaboratrice per sabato 18 luglio";
-  const esempioDisponibilitaCollab = "Sara F. è disponibile per mercoledì 15 luglio dalle 8-13 e venerdì 17 dalle 8-13";
+  const esempioStruttura = { testo: "Casa Duna cerca collaboratrice per sabato 18 luglio", tipo: "struttura", data: "2026-07-18" };
+  const esempiDisponibilitaCollab = [
+    { testo: "Sara F. è disponibile per mercoledì 15 luglio dalle 8-13 e venerdì 17 dalle 8-13", tipo: "collab", data: "2026-07-15" },
+    { testo: "Lucia T. è disponibile per giovedì 16 luglio dalle 8 alle 12", tipo: "collab", data: "2026-07-16" },
+    { testo: "Franca B. è disponibile lunedì 3 agosto dalle 8.30 alle 12.30", tipo: "collab", data: "2026-08-03" }
+  ];
 
-  const voci = [...(richiesteStrutture.length ? richiesteStrutture : [esempioStruttura]), esempioDisponibilitaCollab];
+  const voci = [...(richiesteStrutture.length ? richiesteStrutture : [esempioStruttura]), ...esempiDisponibilitaCollab]
+    .sort((a,b) => (a.data < b.data ? -1 : 1));
 
   return `
     <div class="section-title" style="margin-top:0;">Richieste in corso</div>
     <div class="landing-feed">
-      ${voci.map(v => `<div class="landing-feed-item">${v}</div>`).join("")}
+      ${voci.map(v => `<div class="landing-feed-item${v.tipo === "collab" ? " collab" : ""}">${v.testo}</div>`).join("")}
     </div>
   `;
 }
@@ -991,6 +998,17 @@ function renderStrutturaShell(){
       <div class="kpi"><div class="n">${misRichieste.filter(r=>r.stato==="completata").length}</div><div class="l">completate</div></div>
     </div>
 
+    <div class="card" style="margin-top:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div>
+          <div style="font-weight:600; font-size:14px;">Richiesta aperta a tutte</div>
+          <div class="muted small">Pubblica una data senza scegliere subito una collaboratrice specifica: la prima che accetta se la aggiudica.</div>
+        </div>
+        <button class="primary small" id="toggle-open-request">Pubblica</button>
+      </div>
+      <div class="hidden" id="open-request-form" style="margin-top:12px;"></div>
+    </div>
+
     <div class="section-title">Collaboratrici disponibili</div>
     <div class="stack" id="collab-list"></div>
 
@@ -998,8 +1016,45 @@ function renderStrutturaShell(){
     <div class="stack" id="req-list"></div>
   `;
 
+  renderOpenRequestForm(wrap, s);
   renderCollabListForStruttura(wrap.querySelector("#collab-list"), s);
   renderRichiesteForStruttura(wrap.querySelector("#req-list"), s);
+}
+
+function renderOpenRequestForm(wrap, struttura){
+  const toggleBtn = wrap.querySelector("#toggle-open-request");
+  const formWrap = wrap.querySelector("#open-request-form");
+  toggleBtn.onclick = () => {
+    const isOpen = !formWrap.classList.contains("hidden");
+    if(isOpen){ formWrap.classList.add("hidden"); return; }
+    formWrap.classList.remove("hidden");
+    formWrap.innerHTML = `
+      <div class="field"><label class="field-label">Data</label><input type="date" id="open-f-date" /></div>
+      <div class="field"><label class="field-label">Fascia</label>
+        <select id="open-f-fascia">${FASCE.map(f=>`<option>${f}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label class="field-label">Tipo pulizia</label>
+        <select id="open-f-tipo">${Object.keys(TARIFFE).map(t=>`<option value="${t}">${TARIFFE_LABEL[t]}</option>`).join("")}</select>
+      </div>
+      <button class="primary small" id="open-f-send" style="width:100%;">Pubblica richiesta</button>
+    `;
+    formWrap.querySelector("#open-f-send").onclick = () => {
+      const date = formWrap.querySelector("#open-f-date").value;
+      const fascia = formWrap.querySelector("#open-f-fascia").value;
+      const tipo = formWrap.querySelector("#open-f-tipo").value;
+      const ore = calcOre(struttura.mq, struttura.stanze);
+      const rid = uid("r");
+      db.richieste[rid] = {
+        id: rid, strutturaId: struttura.id, collabId: null,
+        data: date || "da definire", fascia, tipo,
+        ore, guadagno: ore * TARIFFE[tipo],
+        stato: "nuova",
+        recensioneStruttura: null, recensioneCollab: null
+      };
+      persist();
+      renderStrutturaShell();
+    };
+  };
 }
 
 function renderCollabListForStruttura(container, struttura){
@@ -1077,16 +1132,19 @@ function renderRichiesteForStruttura(container, struttura){
     const c = db.collaboratrici[r.collabId];
     const card = document.createElement("div");
     card.className = "card";
-    const statoBadge = {
-      nuova: `<span class="badge warn">in attesa di risposta</span>`,
-      rifiutata: `<span class="badge wait">rifiutata</span>`,
-      accettata: `<span class="badge ok">accettata</span>`,
-      confermata: `<span class="badge ok">confermata da te</span>`,
-      completata: `<span class="badge ok">completata</span>`
-    }[r.stato] || "";
+    const statoBadge = r.stato === "nuova" && !r.collabId
+      ? `<span class="badge warn">aperta a tutte</span>`
+      : {
+          nuova: `<span class="badge warn">in attesa di risposta</span>`,
+          rifiutata: `<span class="badge wait">rifiutata</span>`,
+          accettata: `<span class="badge ok">accettata</span>`,
+          confermata: `<span class="badge ok">confermata da te</span>`,
+          completata: `<span class="badge ok">completata</span>`
+        }[r.stato] || "";
+    const nomeCollab = r.collabId ? (c ? c.nome : "—") : "Aperta a tutte le collaboratrici";
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <div style="font-weight:600; font-size:14px;">${c ? c.nome : "—"} · ${r.data} · ${r.fascia}</div>
+        <div style="font-weight:600; font-size:14px;">${nomeCollab} · ${r.data} · ${r.fascia}</div>
         ${statoBadge}
       </div>
       <div class="muted small">${TARIFFE_LABEL[r.tipo]} · ${r.ore} ore · ${fmtEuro(r.guadagno)}</div>
@@ -1127,6 +1185,35 @@ function renderRichiesteForStruttura(container, struttura){
       actions.innerHTML = `<p class="muted small">Recensione inviata. In attesa che ${c ? c.nome : "la collaboratrice"} recensisca voi.</p>`;
     } else if(r.stato === "completata"){
       actions.innerHTML = `<p class="muted small">Recensioni scambiate e pubblicate.</p>`;
+    }
+
+    if(r.stato === "nuova" || r.stato === "accettata"){
+      const editRow = document.createElement("div");
+      editRow.style.marginTop = "8px";
+      const editBtn = document.createElement("button");
+      editBtn.className = "small";
+      editBtn.textContent = "Modifica data";
+      const editForm = document.createElement("div");
+      editForm.className = "hidden";
+      editForm.style.marginTop = "8px";
+      editBtn.onclick = () => {
+        const isOpen = !editForm.classList.contains("hidden");
+        if(isOpen){ editForm.classList.add("hidden"); return; }
+        editForm.classList.remove("hidden");
+        editForm.innerHTML = `
+          <input type="date" value="${r.data !== 'da definire' ? r.data : ''}" id="edit-date-input-${r.id}" />
+          <button class="primary small" id="edit-date-save-${r.id}" style="margin-top:6px; width:100%;">Salva nuova data</button>
+        `;
+        document.getElementById(`edit-date-save-${r.id}`).onclick = () => {
+          const newDate = document.getElementById(`edit-date-input-${r.id}`).value;
+          r.data = newDate || "da definire";
+          persist();
+          renderStrutturaShell();
+        };
+      };
+      editRow.appendChild(editBtn);
+      editRow.appendChild(editForm);
+      actions.appendChild(editRow);
     }
   });
 }
@@ -1178,6 +1265,9 @@ function renderCollabShell(){
     <div class="section-title">Richieste in attesa</div>
     <div class="stack" id="pending-req"></div>
 
+    <div class="section-title">Richieste aperte</div>
+    <div class="stack" id="open-req"></div>
+
     <div class="section-title">I tuoi impegni</div>
     <div class="stack" id="my-jobs"></div>
 
@@ -1186,8 +1276,51 @@ function renderCollabShell(){
   `;
 
   renderPendingRequests(wrap.querySelector("#pending-req"), c);
+  renderOpenRequests(wrap.querySelector("#open-req"), c);
   renderMyJobs(wrap.querySelector("#my-jobs"), c);
   renderToReview(wrap.querySelector("#to-review"), c);
+}
+
+function renderOpenRequests(container, collab){
+  const list = Object.values(db.richieste).filter(r => r.stato === "nuova" && !r.collabId);
+  if(!list.length){ container.innerHTML = `<p class="muted small">Nessuna richiesta aperta al momento.</p>`; return; }
+  container.innerHTML = "";
+  list.forEach(r => {
+    const s = db.strutture[r.strutturaId];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-weight:600; font-size:14px;">${s ? s.nome : "—"} · ${r.data}, ${r.fascia}</div>
+        <span class="badge warn">aperta</span>
+      </div>
+      <div class="muted small">${s ? s.zona : ""}</div>
+      <div class="muted small">${s ? s.tipo : ""} · ${s ? s.mq : ""} mq · ${s ? s.stanze : ""} stanze${s && s.esterni.length ? " · " + s.esterni.join(", ") : ""}</div>
+      <div class="req-summary">
+        <span>tempo stimato</span><span class="val">${r.ore} ore</span>
+      </div>
+      <div class="req-summary">
+        <span>guadagno potenziale</span><span class="val">${fmtEuro(r.guadagno)}</span>
+      </div>
+      <button data-claim="${r.id}" class="primary small" style="width:100%;">Accetta</button>
+    `;
+    container.appendChild(card);
+  });
+  container.querySelectorAll("[data-claim]").forEach(btn => {
+    btn.onclick = () => {
+      const rid = btn.getAttribute("data-claim");
+      const richiesta = db.richieste[rid];
+      if(!richiesta || richiesta.collabId){
+        showError("questa richiesta è già stata presa da un'altra collaboratrice");
+        renderCollabShell();
+        return;
+      }
+      richiesta.collabId = collab.id;
+      richiesta.stato = "accettata";
+      persist();
+      renderCollabShell();
+    };
+  });
 }
 
 function renderPendingRequests(container, collab){
